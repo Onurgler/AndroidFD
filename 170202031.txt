@@ -1,0 +1,363 @@
+/////////////////MainActivity//////////////////
+
+    package com.example.yazlab;
+    
+    import android.content.ContentValues;
+    import android.content.Intent;
+    import android.graphics.Bitmap;
+    import android.graphics.BitmapFactory;
+    import android.net.Uri;
+    import android.os.Bundle;
+    import android.provider.MediaStore;
+    import android.widget.Button;
+    
+    import com.google.android.gms.tasks.OnFailureListener;
+    import com.google.android.gms.tasks.OnSuccessListener;
+    import com.google.firebase.ml.vision.FirebaseVision;
+    import com.google.firebase.ml.vision.common.FirebaseVisionImage;
+    import com.google.firebase.ml.vision.label.FirebaseVisionImageLabel;
+    import com.google.firebase.ml.vision.label.FirebaseVisionImageLabeler;
+    import com.google.firebase.storage.FileDownloadTask;
+    import com.google.firebase.storage.FirebaseStorage;
+    import com.google.firebase.storage.StorageReference;
+    import com.google.firebase.storage.UploadTask;
+    import androidx.annotation.NonNull;
+    import androidx.appcompat.app.AppCompatActivity;
+    import android.view.View;
+    import android.widget.EditText;
+    import android.widget.ImageView;
+    import android.widget.Toast;
+    import java.io.File;
+    import java.io.IOException;
+    import java.util.List;
+    
+    public class MainActivity extends AppCompatActivity {
+    
+        FirebaseStorage storage = FirebaseStorage.getInstance();
+        StorageReference ref=storage.getReference();
+        int tut=0;  Bitmap bitmap;
+        Uri imauri;     ImageView mImg;     Intent tutint=null;      Uri tuturi; String tuts="";
+        File locfi=File.createTempFile("images","jpg");
+        public MainActivity() throws IOException {
+        }
+    
+        @Override
+        protected void onCreate(Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.activity_main);
+            mImg=findViewById(R.id.image_view);
+            Bitmap asd;
+            Button but1 = findViewById(R.id.but1);
+            but1.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    Intent i=new Intent(Intent.ACTION_PICK);
+                    i.setType("image/*");
+                    startActivityForResult(i,1);
+                }
+            });
+    
+            Button but2 = findViewById(R.id.but2);
+            but2.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    ContentValues values=new ContentValues();
+                    values.put(MediaStore.Images.Media.TITLE,"New Pic");
+                    values.put(MediaStore.Images.Media.DESCRIPTION,"From Cam");
+                    imauri=getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,values);
+                    Intent tak = new Intent (MediaStore.ACTION_IMAGE_CAPTURE);
+                    tak.putExtra(MediaStore.EXTRA_OUTPUT,imauri);
+                    if (tak.resolveActivity(getPackageManager()) != null) {
+                        startActivityForResult(tak,2);
+                    }
+                }
+            });
+    
+            Button but3 = findViewById(R.id.but3);
+            but3.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    if (tuturi != null) {
+                        EditText edt=findViewById(R.id.editText2);
+                        String yol=edt.getText().toString();
+                        int asd=Integer.parseInt(yol); tuts=yol;
+                        if(asd<1||asd>99)
+                            Toast.makeText(MainActivity.this,"1 ile 100 arasında bir sıkıştırma değeri gir",Toast.LENGTH_LONG).show();
+                        else{
+                            String[] de=tuturi.getLastPathSegment().split("/");
+                            String dee=de[de.length-1];
+                            yol=yol+"-"+dee;
+                        StorageReference refe=ref.child(yol);
+                        refe.putFile(tuturi).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+                            @Override
+                            public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                                Toast.makeText(MainActivity.this,"Resim sıkıştırıldı",Toast.LENGTH_LONG).show();
+                            }
+                        });
+                        }
+                    }
+                }
+            });
+    
+            Button but4 = findViewById(R.id.but4);
+            but4.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    StorageReference refin=ref.child("thumb_"+tuts);
+                    refin.getFile(locfi).addOnSuccessListener(new OnSuccessListener<FileDownloadTask.TaskSnapshot>() {
+                        @Override
+                        public void onSuccess(FileDownloadTask.TaskSnapshot taskSnapshot) {
+                            Bitmap bitmap= BitmapFactory.decodeFile(locfi.getAbsolutePath());
+                            mImg.setImageBitmap(bitmap);
+                            Toast.makeText(MainActivity.this,"Resim yüklendi",Toast.LENGTH_LONG).show();
+                        }
+                    });
+                }
+            });
+    
+            Button but5 = findViewById(R.id.but5);
+            but5.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    if(tut==2)
+                    try {
+                        bitmap=MediaStore.Images.Media.getBitmap(getContentResolver(),imauri);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    FirebaseVisionImage image =FirebaseVisionImage.fromBitmap(bitmap);
+                    //FirebaseVisionImage image =FirebaseVisionImage.fromFilePath(,imauri);
+                    FirebaseVisionImageLabeler labeler = FirebaseVision.getInstance()
+                            .getCloudImageLabeler();
+                    labeler.processImage(image)
+                            .addOnSuccessListener(new OnSuccessListener<List<FirebaseVisionImageLabel>>() {
+                                @Override
+                                public void onSuccess(List<FirebaseVisionImageLabel> labels) { int a=0;
+                                    for (FirebaseVisionImageLabel label: labels) { if(a>3) break;
+                                        String text = label.getText();
+                                        String entityId = label.getEntityId();
+                                        float confidence = label.getConfidence();
+                                        Toast.makeText(MainActivity.this,text,Toast.LENGTH_LONG).show();
+                                        a++;
+                                    }
+                                }
+                            })
+                            .addOnFailureListener(new OnFailureListener() {
+                                @Override
+                                public void onFailure(@NonNull Exception e) {
+    
+                                }
+                            });
+    
+                }
+            });
+    
+        }
+    
+        protected void onActivityResult(int requestCode,int resultCode,Intent data){
+            super.onActivityResult(requestCode,resultCode,data);
+            if(requestCode==1 && resultCode==RESULT_OK){ tut=1;
+                Uri urid=data.getData();
+                mImg.setImageURI(urid);
+                tuturi=urid;
+                bitmap= BitmapFactory.decodeFile(urid.getLastPathSegment());
+    
+            }
+            else if (requestCode == 2 && resultCode==RESULT_OK) { tut=2;
+                mImg.setImageURI(imauri);
+                Uri urid = imauri;
+                tuturi=urid;
+            }
+        }
+    
+    }
+    
+//////////////////////////////////Content_main///////////
+
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+
+    <ImageView
+        android:id="@+id/image_view"
+        android:layout_width="348dp"
+        android:layout_height="324dp"
+        android:scaleType="centerCrop"
+        android:src="@drawable/ic_image_black_24dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.129"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/but1"
+        app:layout_constraintVertical_bias="0.0" />
+
+    <Button
+        android:id="@+id/but1"
+        android:layout_width="160dp"
+        android:layout_height="90dp"
+        android:text="@string/dosyadan_resim_sec"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.083"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.125" />
+
+    <Button
+        android:id="@+id/but2"
+        android:layout_width="160dp"
+        android:layout_height="90dp"
+        android:text="@string/kamera_ile_yeni_resim_cek"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.126"
+        app:layout_constraintStart_toEndOf="@+id/but1"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.125" />
+
+    <Button
+        android:id="@+id/but3"
+        android:layout_width="112dp"
+        android:layout_height="60dp"
+        android:text="Sıkıştır"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.072"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/image_view"
+        app:layout_constraintVertical_bias="0.0" />
+
+    <Button
+        android:id="@+id/but4"
+        android:layout_width="112dp"
+        android:layout_height="60dp"
+        android:text="göster"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.457"
+        app:layout_constraintStart_toEndOf="@+id/but3"
+        app:layout_constraintTop_toBottomOf="@+id/image_view"
+        app:layout_constraintVertical_bias="0.0" />
+
+    <EditText
+        android:id="@+id/editText2"
+        android:layout_width="80dp"
+        android:layout_height="40dp"
+        android:ems="3"
+        android:inputType="number"
+        android:text="75"
+        android:textColorLink="#FFFFFF"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toEndOf="@+id/but3"
+        app:layout_constraintTop_toBottomOf="@+id/textView2"
+        app:layout_constraintVertical_bias="0.0" />
+
+    <TextView
+        android:id="@+id/textView2"
+        android:layout_width="94dp"
+        android:layout_height="19dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toEndOf="@+id/but3"
+        app:layout_constraintTop_toBottomOf="@+id/image_view"
+        app:layout_constraintVertical_bias="0.0" />
+
+    <Button
+        android:id="@+id/but5"
+        android:layout_width="200dp"
+        android:layout_height="43dp"
+        android:text="Nesne Algıla"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.284"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/but3"
+        app:layout_constraintVertical_bias="0.059" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
+
+//////////////////////FİREBASE FUNCTİONS/////////////////////////index.js
+/////////////Kaynak:https://github.com/firebase/functions-samples/tree/master/quickstarts/thumbnails
+/**
+ * Copyright 2016 Google Inc. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+'use strict';
+
+// [START import]
+const functions = require('firebase-functions');
+const admin = require('firebase-admin');
+admin.initializeApp()
+const spawn = require('child-process-promise').spawn;
+const path = require('path');
+const os = require('os');
+const fs = require('fs');
+
+exports.generateThumbnail = functions.storage.object().onFinalize(async (object) => {
+
+  const fileBucket = object.bucket; // The Storage bucket that contains the file.
+  const filePath = object.name; // File path in the bucket.
+  const contentType = object.contentType; // File content type.
+  const metageneration = object.metageneration; // Number of times metadata has been generated. New objects have a value of 1.
+  // [END eventAttributes]
+  console.log(object);
+
+  if (!contentType.startsWith('image/')) {
+    return console.log('This is not an image.');
+  }
+
+  // Get the file name.
+  const fileName = path.basename(filePath);
+  // Exit if the image is already a thumbnail.
+  if (fileName.startsWith('thumb_')) {
+    return console.log('Already a Thumbnail.');
+  }
+
+  const bucket = admin.storage().bucket(fileBucket);
+  const tempFilePath = path.join(os.tmpdir(), fileName);
+  const metadata = {
+    contentType: contentType,
+    firebaseStorageDownloadTokens: '8OFA0VQsX2hNwa5nAKOX34HgNiczo6ee3QW54L44',
+  };
+  await bucket.file(filePath).download({destination: tempFilePath});
+  console.log('Image downloaded locally to', tempFilePath);
+  // Generate a thumbnail using ImageMagick.
+  var stri=fileName.split("-");
+  var ilk=stri[0];
+  await spawn('convert', [tempFilePath, '-quality', ilk , tempFilePath]);
+  console.log('Thumbnail created at', tempFilePath);
+  // We add a 'thumb_' prefix to thumbnails file name. That's where we'll upload the thumbnail.
+  const thumbFileName = `thumb_${ilk}`;
+  const thumbFilePath = path.join(path.dirname(filePath), thumbFileName);
+  // Uploading the thumbnail.
+  await bucket.upload(tempFilePath, {
+    destination: thumbFilePath,
+    metadata: { 
+      contentType: contentType,
+      metadata: metadata
+    }
+  });
+  // Once the thumbnail has been uploaded delete the local file to free up disk space.
+  return fs.unlinkSync(tempFilePath);
+  // [END thumbnailGeneration]
+});
+// [END generateThumbnail]
+
